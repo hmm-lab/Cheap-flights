@@ -9,10 +9,17 @@ load_dotenv()
 app = Flask(__name__, static_folder="static")
 CORS(app)
 
-amadeus = Client(
-    client_id=os.getenv("AMADEUS_CLIENT_ID"),
-    client_secret=os.getenv("AMADEUS_CLIENT_SECRET"),
-)
+_amadeus = None
+
+def get_amadeus():
+    global _amadeus
+    if _amadeus is None:
+        client_id = os.getenv("AMADEUS_CLIENT_ID")
+        client_secret = os.getenv("AMADEUS_CLIENT_SECRET")
+        if not client_id or not client_secret:
+            raise ValueError("AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET environment variables are not set.")
+        _amadeus = Client(client_id=client_id, client_secret=client_secret)
+    return _amadeus
 
 
 def parse_duration(iso_duration):
@@ -90,7 +97,7 @@ def search_flights():
         params["returnDate"] = return_date
 
     try:
-        response = amadeus.shopping.flight_offers_search.get(**params)
+        response = get_amadeus().shopping.flight_offers_search.get(**params)
         offers = [format_offer(o) for o in response.data]
         offers.sort(key=lambda x: x["price"])
         return jsonify({"offers": offers, "count": len(offers)})
@@ -106,7 +113,7 @@ def airport_search():
     if len(keyword) < 2:
         return jsonify({"results": []})
     try:
-        response = amadeus.reference_data.locations.get(
+        response = get_amadeus().reference_data.locations.get(
             keyword=keyword,
             subType="AIRPORT,CITY",
             page={"limit": 8},
